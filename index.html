@@ -67,8 +67,14 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.1); touch-action: pan-y;
         }
         .card.sortable-chosen { background: #e2e8f0; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
-        .card-left { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; }
-        .drag-handle { color: #adb5bd; font-size: 1.2rem; cursor: grab; padding: 4px; }
+        .card-left { display: flex; align-items: center; gap: 10px; flex: 1; }
+        
+        /* 드래그 손잡이 스타일 */
+        .drag-handle {
+            color: #adb5bd; font-size: 1.3rem; cursor: grab; padding: 4px 8px;
+            touch-action: none; /* 손잡이 영역에서는 터치 스크롤 방지 및 이동 전용 조작 */
+        }
+        .drag-handle:active { cursor: grabbing; color: #495057; }
         
         .status-tag { padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; color: white; cursor: pointer; }
         .status-미완료 { background-color: var(--pending); }
@@ -99,10 +105,11 @@
 
         const SECRET_PASSWORD = "3중대!";
 
+        // 💡 수정된 기본 인원 명단 (11명)
         const defaultItems = [
-            "중대장님", "보급관님", "기동소대장님", "대기동소대장님", 
-            "운용관님", "공병소대장", "V2 김현균", "V2 우정현", 
-            "행정반", "V 김태호", "신인성 1", "신인성 2", "노트북", "당직부사관"
+            "중대장님", "보급관님", "기동소대장", "대기동소대장", 
+            "운용관님", "V2 김현균", "V2 우정현", "V2 김인수", 
+            "V1 김태호", "V1 채정욱", "V1 김민후"
         ];
 
         let globalData = {};
@@ -172,7 +179,7 @@
             const title = prompt("새 현황판 제목을 입력하세요 (예: TACS 재설치):");
             if(!title) return;
 
-            const inputStr = prompt("참여 인원/항목을 쉼표(,)로 구분해서 입력하세요.\n(비워두면 기본 14명으로 생성됩니다)");
+            const inputStr = prompt("참여 인원/항목을 쉼표(,)로 구분해서 입력하세요.\n(비워두면 기본 11명으로 생성됩니다)");
             let items = defaultItems;
             
             if(inputStr && inputStr.trim() !== "") {
@@ -270,10 +277,7 @@
             if(sortableInstance) sortableInstance.destroy();
             sortableInstance = new Sortable(container, {
                 animation: 150,
-                delay: 400, // 💡 0.4초 동안 꾹 눌러야만 드래그가 시작되도록 설정 (스크롤 방해 원천 차단)
-                delayOnTouchOnly: true, // 모바일 터치 환경에서만 꾹 누르기 적용
-                touchStartThreshold: 5,
-                handle: '.drag-handle', // 💡 왼쪽에 있는 '☰' 손잡이를 길게 꾹 잡고 끌어야만 순서가 바뀜
+                handle: '.drag-handle', // 💡 손잡이인 '☰' 아이콘을 통해서만 이동 동작이 시작됨
                 onEnd: function (evt) {
                     const movedItem = items.splice(evt.oldIndex, 1)[0];
                     items.splice(evt.newIndex, 0, movedItem);
