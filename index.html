@@ -64,11 +64,11 @@
         .card {
             background: var(--card-bg); padding: 12px 16px; border-radius: 8px;
             display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: grab; touch-action: pan-y;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); touch-action: pan-y;
         }
-        .card:active { cursor: grabbing; background: #e9ecef; }
-        .card-left { display: flex; align-items: center; gap: 8px; flex: 1; }
-        .drag-handle { color: #adb5bd; font-size: 1.2rem; margin-right: 4px; }
+        .card.sortable-chosen { background: #e2e8f0; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        .card-left { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; }
+        .drag-handle { color: #adb5bd; font-size: 1.2rem; cursor: grab; padding: 4px; }
         
         .status-tag { padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; color: white; cursor: pointer; }
         .status-미완료 { background-color: var(--pending); }
@@ -97,7 +97,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // 💡 비밀번호 설정
         const SECRET_PASSWORD = "3중대!";
 
         const defaultItems = [
@@ -254,9 +253,9 @@
                 const card = document.createElement('div');
                 card.className = 'card';
                 card.innerHTML = `
-                    <div class="card-left" onclick="toggleStatus(${idx})">
+                    <div class="card-left">
                         <span class="drag-handle">☰</span>
-                        <span style="font-weight: 600;">${item.name}</span>
+                        <span style="font-weight: 600; flex:1;" onclick="toggleStatus(${idx})">${item.name}</span>
                     </div>
                     <span class="status-tag status-${item.status}" onclick="toggleStatus(${idx})">${item.status}</span>
                 `;
@@ -271,7 +270,10 @@
             if(sortableInstance) sortableInstance.destroy();
             sortableInstance = new Sortable(container, {
                 animation: 150,
-                handle: '.card',
+                delay: 400, // 💡 0.4초 동안 꾹 눌러야만 드래그가 시작되도록 설정 (스크롤 방해 원천 차단)
+                delayOnTouchOnly: true, // 모바일 터치 환경에서만 꾹 누르기 적용
+                touchStartThreshold: 5,
+                handle: '.drag-handle', // 💡 왼쪽에 있는 '☰' 손잡이를 길게 꾹 잡고 끌어야만 순서가 바뀜
                 onEnd: function (evt) {
                     const movedItem = items.splice(evt.oldIndex, 1)[0];
                     items.splice(evt.newIndex, 0, movedItem);
