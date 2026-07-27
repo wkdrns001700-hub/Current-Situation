@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TACS 재설치 현황판</title>
+    <title>Current-Situation (실시간 종합 현황판)</title>
     <style>
         :root {
             --bg-color: #f4f6f8;
             --card-bg: #ffffff;
             --primary: #1976d2;
             --complete: #2e7d32;
-            --progress: #ed6c02;
             --pending: #d32f2f;
         }
         body {
@@ -18,8 +17,6 @@
             background-color: var(--bg-color);
             margin: 0; padding: 16px; color: #333;
         }
-        
-        /* 비밀번호 모달 */
         #login-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8); display: flex;
@@ -37,74 +34,266 @@
             width: 90%; padding: 10px; background: var(--primary);
             color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;
         }
-
-        /* 메인 현황판 */
         .header {
             position: sticky; top: 0; background: var(--bg-color);
-            padding-bottom: 12px; margin-bottom: 12px; border-bottom: 2px solid #ddd;
+            padding-bottom: 12px; margin-bottom: 12px; border-bottom: 2px solid #ddd; z-index: 10;
+        }
+        .category-select-box {
+            display: flex; gap: 8px; margin-bottom: 12px; align-items: center;
+        }
+        select {
+            flex: 1; padding: 8px 12px; font-size: 1rem; border-radius: 6px; border: 1px solid #ccc;
+        }
+        .title-area {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+        }
+        .title-area h2 { margin: 0; font-size: 1.2rem; }
+        .edit-title-btn {
+            background: #6c757d; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;
         }
         .progress-box { background: #e0e0e0; border-radius: 8px; height: 12px; overflow: hidden; }
         .progress-bar { background: var(--complete); height: 100%; width: 0%; transition: width 0.3s; }
         
         .grid { display: grid; gap: 8px; margin-bottom: 20px; }
         .card {
-            background: var(--card-bg); padding: 12px 16px; border-radius: 8px;
+            background: var(--card-bg); padding: 10px 14px; border-radius: 8px;
             display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; user-select: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); user-select: none;
         }
-        .status-tag { padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; color: white; }
+        .card-left { display: flex; align-items: center; gap: 8px; flex: 1; cursor: pointer; }
+        .card-controls { display: flex; align-items: center; gap: 4px; }
+        .order-btn {
+            background: #e9ecef; border: 1px solid #ced4da; border-radius: 4px;
+            padding: 4px 8px; font-size: 0.75rem; cursor: pointer;
+        }
+        .status-tag { padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; color: white; cursor: pointer; }
         .status-미완료 { background-color: var(--pending); }
-        .status-진행중 { background-color: var(--progress); }
         .status-완료 { background-color: var(--complete); }
 
-        .copy-btn {
-            width: 100%; padding: 14px; background: #343a40; color: white;
-            border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer;
+        .btn-group { display: flex; flex-direction: column; gap: 8px; }
+        .action-btn {
+            width: 100%; padding: 12px; color: white; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: bold; cursor: pointer;
         }
+        .bg-dark { background: #343a40; }
     </style>
+
+    <!-- 파이어베이스 SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // 💡 전달주신 Firebase 설정값 자동 적용 완료
+        const firebaseConfig = {
+            apiKey: "AIzaSyCP_8yZ6btjm0UhF7BCsG95yWqk5-z6SUk",
+            authDomain: "current-situation-e495e.firebaseapp.com",
+            databaseURL: "https://current-situation-e495e-default-rtdb.firebaseio.com",
+            projectId: "current-situation-e495e",
+            storageBucket: "current-situation-e495e.firebasestorage.app",
+            messagingSenderId: "747638141846",
+            appId: "1:747638141846:web:237be8934736cbbb4123b7",
+            measurementId: "G-4Z2B3T2CVT"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const SECRET_PASSWORD = "1234"; // 💡 접속 비밀번호 (필요시 변경)
+
+        const defaultItems = [
+            "중대장님", "보급관님", "기동소대장님", "대기동소대장님", 
+            "운용관님", "공병소대장", "V2 김현균", "V2 우정현", 
+            "행정반", "V 김태호", "신인성 1", "신인성 2", "노트북", "당직부사관"
+        ];
+
+        let globalData = {};
+        let currentCategory = "cat_1";
+
+        window.checkPassword = function() {
+            const input = document.getElementById('pw-input').value;
+            if(input === SECRET_PASSWORD) {
+                document.getElementById('login-modal').style.display = 'none';
+                initRealtimeSync();
+            } else {
+                alert('비밀번호가 틀렸습니다.');
+                document.getElementById('pw-input').value = '';
+            }
+        }
+
+        function initRealtimeSync() {
+            const rootRef = ref(db, 'current_situation');
+            
+            onValue(rootRef, (snapshot) => {
+                const serverData = snapshot.val();
+                if (serverData) {
+                    globalData = serverData;
+                } else {
+                    globalData = {
+                        categories: {
+                            "cat_1": {
+                                title: "TACS 재설치 현황",
+                                items: defaultItems.map(name => ({ name: name, status: "미완료" }))
+                            }
+                        }
+                    };
+                    set(rootRef, globalData);
+                }
+                updateCategorySelect();
+                render();
+            });
+        }
+
+        function saveData() {
+            const rootRef = ref(db, 'current_situation');
+            set(rootRef, globalData);
+        }
+
+        function updateCategorySelect() {
+            const select = document.getElementById('category-select');
+            select.innerHTML = '';
+            
+            const categories = globalData.categories || {};
+            Object.keys(categories).forEach(catId => {
+                const opt = document.createElement('option');
+                opt.value = catId;
+                opt.innerText = categories[catId].title;
+                if(catId === currentCategory) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        window.changeCategory = function() {
+            const select = document.getElementById('category-select');
+            currentCategory = select.value;
+            render();
+        }
+
+        window.addCategory = function() {
+            const title = prompt("새로 종합할 항목/주제를 입력하세요 (예: 식권구매 등):");
+            if(!title) return;
+
+            const newCatId = "cat_" + Date.now();
+            if(!globalData.categories) globalData.categories = {};
+            
+            globalData.categories[newCatId] = {
+                title: title,
+                items: defaultItems.map(name => ({ name: name, status: "미완료" }))
+            };
+            
+            currentCategory = newCatId;
+            saveData();
+        }
+
+        window.editTitle = function() {
+            const cat = globalData.categories[currentCategory];
+            const newTitle = prompt("현황판 제목을 수정하세요:", cat.title);
+            if(newTitle && newTitle.trim() !== "") {
+                cat.title = newTitle.trim();
+                saveData();
+            }
+        }
+
+        window.toggleStatus = function(index) {
+            const items = globalData.categories[currentCategory].items;
+            items[index].status = (items[index].status === "완료") ? "미완료" : "완료";
+            saveData();
+        }
+
+        window.moveItem = function(index, direction) {
+            const items = globalData.categories[currentCategory].items;
+            const targetIndex = index + direction;
+
+            if (targetIndex < 0 || targetIndex >= items.length) return;
+
+            const temp = items[index];
+            items[index] = items[targetIndex];
+            items[targetIndex] = temp;
+
+            saveData();
+        }
+
+        function render() {
+            const container = document.getElementById('list-container');
+            container.innerHTML = '';
+            
+            const cat = globalData.categories ? globalData.categories[currentCategory] : null;
+            if(!cat) return;
+
+            document.getElementById('board-title').innerText = cat.title;
+
+            let completedCount = 0;
+            const items = cat.items || [];
+
+            items.forEach((item, idx) => {
+                if(item.status === "완료") completedCount++;
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-left" onclick="toggleStatus(${idx})">
+                        <span style="font-weight: 600;">${item.name}</span>
+                    </div>
+                    <div class="card-controls">
+                        <span class="status-tag status-${item.status}" onclick="toggleStatus(${idx})">${item.status}</span>
+                        <button class="order-btn" onclick="moveItem(${idx}, -1)">▲</button>
+                        <button class="order-btn" onclick="moveItem(${idx}, 1)">▼</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            const total = items.length;
+            const percent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+            document.getElementById('progress-text').innerText = `${completedCount}/${total} (${percent}%)`;
+        }
+
+        window.copyToClipboard = function() {
+            const cat = globalData.categories[currentCategory];
+            let text = `[${cat.title}]\n\n`;
+            cat.items.forEach(item => {
+                text += `- ${item.name} : ${item.status}\n`;
+            });
+            
+            navigator.clipboard.writeText(text).then(() => {
+                alert("카톡 보고용 텍스트가 복사되었습니다!");
+            });
+        }
+    </script>
 </head>
 <body>
 
-<!-- 비밀번호 입력 창 -->
 <div id="login-modal">
     <div class="login-box">
-        <h3>🔒 TACS 현황 접속</h3>
+        <h3>🔒 Current-Situation</h3>
         <p style="font-size: 0.85rem; color: #666;">비밀번호를 입력하세요</p>
         <input type="password" id="pw-input" placeholder="비밀번호" maxlength="4">
         <button onclick="checkPassword()">확인</button>
     </div>
 </div>
 
-<!-- 메인 화면 -->
 <div class="header">
-    <h2 style="margin:0 0 8px 0; font-size: 1.2rem;">📋 TACS 재설치 현황</h2>
-    <div style="font-size: 0.9rem; margin-bottom: 6px;">진행률: <span id="progress-text">0/14 (0%)</span></div>
+    <div class="category-select-box">
+        <select id="category-select" onchange="changeCategory()"></select>
+        <button class="edit-title-btn" style="padding: 8px 12px;" onclick="addCategory()">＋ 새 현황판</button>
+    </div>
+
+    <div class="title-area">
+        <h2 id="board-title">현황판</h2>
+        <button class="edit-title-btn" onclick="editTitle()">✏️ 제목 수정</button>
+    </div>
+
+    <div style="font-size: 0.85rem; margin-bottom: 6px;">진행률: <span id="progress-text">0/0 (0%)</span></div>
     <div class="progress-box"><div class="progress-bar" id="progress-bar"></div></div>
 </div>
 
 <div class="grid" id="list-container"></div>
 
-<button class="copy-btn" onclick="copyToClipboard()">📱 현황 텍스트 카톡 복사하기</button>
+<div class="btn-group">
+    <button class="action-btn bg-dark" onclick="copyToClipboard()">📱 카톡 보고용 텍스트 복사</button>
+</div>
 
-<script>
-    // 💡 설정할 비밀번호 (원하는 4자리 숫자로 변경 가능)
-    const SECRET_PASSWORD = "1234";
-
-    const items = [
-        "중대장님", "보급관님", "기동소대장님", "대기동소대장님", 
-        "운용관님", "공병소대장", "V2 김현균", "V2 우정현", 
-        "행정반", "V 김태호", "신인성 1", "신인성 2", "노트북", "당직부사관"
-    ];
-    const statuses = ["미완료", "진행중", "완료"];
-
-    let data = JSON.parse(localStorage.getItem('tacs_status_data')) || 
-        items.reduce((acc, cur) => ({...acc, [cur]: "미완료"}), {});
-
-    function checkPassword() {
-        const input = document.getElementById('pw-input').value;
-        if(input === SECRET_PASSWORD) {
-            document.getElementById('login-modal').style.display = 'none';
-            render();
+</body>
+</html>
         } else {
             alert('비밀번호가 틀렸습니다.');
             document.getElementById('pw-input').value = '';
