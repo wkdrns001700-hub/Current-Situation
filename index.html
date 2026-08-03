@@ -12,6 +12,7 @@
             --card-bg: #ffffff;
             --primary: #1976d2;
             --complete: #2e7d32;
+            --limited: #ed6c02; /* 제한됨 노란/오렌지빛 색상 */
             --pending: #d32f2f;
         }
         body {
@@ -72,12 +73,13 @@
         /* 드래그 손잡이 스타일 */
         .drag-handle {
             color: #adb5bd; font-size: 1.3rem; cursor: grab; padding: 4px 8px;
-            touch-action: none; /* 손잡이 영역에서는 터치 스크롤 방지 및 이동 전용 조작 */
+            touch-action: none;
         }
         .drag-handle:active { cursor: grabbing; color: #495057; }
         
         .status-tag { padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; color: white; cursor: pointer; }
         .status-미완료 { background-color: var(--pending); }
+        .status-제한됨 { background-color: var(--limited); }
         .status-완료 { background-color: var(--complete); }
 
         .action-btn {
@@ -103,14 +105,16 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        const SECRET_PASSWORD = "3wndeo!";
+        const SECRET_PASSWORD = "3중대!";
 
-        // 💡 수정된 기본 인원 명단 (11명)
+        // 💡 수정된 기본 인원 명단 (9명) - 우정현, 김태호 제외 반영
         const defaultItems = [
             "중대장님", "보급관님", "기동소대장", "대기동소대장", 
-            "운용관님", "V2 김현균", "V2 우정현", "V2 김인수", 
-            "V1 김태호", "V1 채정욱", "V1 김민후"
+            "운용관님", "V2 김현균", "V2 김인수", 
+            "V1 채정욱", "V1 김민후"
         ];
+
+        const statuses = ["미완료", "제한됨", "완료"];
 
         let globalData = {};
         let currentCategory = "cat_1";
@@ -179,7 +183,7 @@
             const title = prompt("새 현황판 제목을 입력하세요 (예: TACS 재설치):");
             if(!title) return;
 
-            const inputStr = prompt("참여 인원/항목을 쉼표(,)로 구분해서 입력하세요.\n(비워두면 기본 11명으로 생성됩니다)");
+            const inputStr = prompt("참여 인원/항목을 쉼표(,)로 구분해서 입력하세요.\n(비워두면 기본 9명으로 생성됩니다)");
             let items = defaultItems;
             
             if(inputStr && inputStr.trim() !== "") {
@@ -236,9 +240,15 @@
             }
         }
 
+        // 상태값 순환 변경: 미완료(0) -> 제한됨(1) -> 완료(2) -> 미완료(0)
         window.toggleStatus = function(index) {
             const items = globalData.categories[currentCategory].items;
-            items[index].status = (items[index].status === "완료") ? "미완료" : "완료";
+            let currentStatus = items[index].status || "미완료";
+            let currentIdx = statuses.indexOf(currentStatus);
+            if(currentIdx === -1) currentIdx = 0;
+            
+            let nextIdx = (currentIdx + 1) % statuses.length;
+            items[index].status = statuses[nextIdx];
             saveData();
         }
 
@@ -255,7 +265,8 @@
             const items = cat.items || [];
 
             items.forEach((item, idx) => {
-                if(item.status === "완료") completedCount++;
+                const status = item.status || "미완료";
+                if(status === "완료") completedCount++;
 
                 const card = document.createElement('div');
                 card.className = 'card';
@@ -264,7 +275,7 @@
                         <span class="drag-handle">☰</span>
                         <span style="font-weight: 600; flex:1;" onclick="toggleStatus(${idx})">${item.name}</span>
                     </div>
-                    <span class="status-tag status-${item.status}" onclick="toggleStatus(${idx})">${item.status}</span>
+                    <span class="status-tag status-${status}" onclick="toggleStatus(${idx})">${status}</span>
                 `;
                 container.appendChild(card);
             });
@@ -277,7 +288,7 @@
             if(sortableInstance) sortableInstance.destroy();
             sortableInstance = new Sortable(container, {
                 animation: 150,
-                handle: '.drag-handle', // 💡 손잡이인 '☰' 아이콘을 통해서만 이동 동작이 시작됨
+                handle: '.drag-handle',
                 onEnd: function (evt) {
                     const movedItem = items.splice(evt.oldIndex, 1)[0];
                     items.splice(evt.newIndex, 0, movedItem);
@@ -290,7 +301,7 @@
             const cat = globalData.categories[currentCategory];
             let text = `[${cat.title}]\n\n`;
             cat.items.forEach(item => {
-                text += `- ${item.name} : ${item.status}\n`;
+                text += `- ${item.name} : ${item.status || "미완료"}\n`;
             });
             
             navigator.clipboard.writeText(text).then(() => {
