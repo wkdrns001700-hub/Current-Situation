@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>영문 이름 종합 시스템</title>
-    <!-- Tailwind CSS CDN (빠르고 깔끔한 디자인용) -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
@@ -35,7 +35,7 @@
         <div id="statusMessage" class="mt-4 text-center text-sm font-medium"></div>
     </div>
 
-    <!-- 제출된 현황 요약 (선택 사항) -->
+    <!-- 제출된 현황 요약 -->
     <div class="bg-white shadow-md rounded-lg p-6 w-full max-w-md mt-6">
         <h2 class="text-lg font-bold text-gray-800 mb-3">제출 현황 (<span id="count">0</span>명)</h2>
         <div class="max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2">
@@ -45,20 +45,21 @@
         </div>
     </div>
 
-    <!-- Firebase SDK (Modular v10 CDN) -->
+    <!-- Firebase SDK 및 연동 로직 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // TODO: 본인의 파이어베이스 콘솔에서 복사한 설정 값으로 아래를 교체하세요!
+        // 본인 파이어베이스 설정 정보 적용 완료
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            databaseURL: "YOUR_DATABASE_URL",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyDYr7B415Z0onXBcHk-VdWYoEzeWi1rQL8",
+            authDomain: "name-collector-fbf83.firebaseapp.com",
+            databaseURL: "https://name-collector-fbf83-default-rtdb.firebaseio.com",
+            projectId: "name-collector-fbf83",
+            storageBucket: "name-collector-fbf83.firebasestorage.app",
+            messagingSenderId: "487664795850",
+            appId: "1:487664795850:web:d048e26e888d51e5d7f433",
+            measurementId: "G-T2CRZSEV09"
         };
 
         // 파이어베이스 초기화
@@ -77,7 +78,6 @@
             const korean = document.getElementById('koreanName').value.trim();
             const english = document.getElementById('englishName').value.trim();
 
-            // Realtime Database의 'submissions' 경로에 데이터 밀어넣기 (push로 고유 ID 생성)
             push(ref(db, 'submissions'), {
                 koreanName: korean,
                 englishName: english,
@@ -85,14 +85,14 @@
             }).then(() => {
                 statusMessage.textContent = "성공적으로 제출되었습니다!";
                 statusMessage.className = "mt-4 text-center text-sm font-medium text-green-600";
-                form.reset(); // 폼 초기화
+                form.reset();
             }).catch((error) => {
                 statusMessage.textContent = "제출 실패: " + error.message;
                 statusMessage.className = "mt-4 text-center text-sm font-medium text-red-600";
             });
         });
 
-        // 2. 실시간으로 데이터 불러와서 화면에 뿌려주기
+        // 2. 실시간 데이터 불러와서 화면에 뿌려주기
         const submissionsRef = ref(db, 'submissions');
         onValue(submissionsRef, (snapshot) => {
             nameList.innerHTML = '';
